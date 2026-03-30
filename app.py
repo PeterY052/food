@@ -39,6 +39,17 @@ def _require_login_and_get_user_id() -> str:
         return "local"
 
     try:
+        # 如果没配置 auth secrets，st.login 往往会直接报错。这里提前给出明确提示。
+        try:
+            auth_cfg = st.secrets.get("auth", None)
+        except Exception:
+            auth_cfg = None
+        if not auth_cfg:
+            st.error(
+                "未检测到 Streamlit Auth 配置（`[auth]`）。请到 Streamlit Cloud → App settings → Secrets 里添加 `[auth]` 配置后再刷新。"
+            )
+            st.stop()
+
         u = st.user  # type: ignore[attr-defined]
         is_logged_in = bool(getattr(u, "is_logged_in", False))
         if not is_logged_in:
@@ -53,8 +64,8 @@ def _require_login_and_get_user_id() -> str:
             st.error("登录成功但未拿到稳定 user_id（缺少 sub/email）。请检查 OIDC 配置。")
             st.stop()
         return user_id
-    except Exception:
-        st.error("当前运行环境不支持 `st.login/st.user`。公网部署请使用 Streamlit Community Cloud 并配置 OIDC。")
+    except Exception as e:
+        st.error(f"登录组件初始化失败：{e}\n\n请确认已在 Streamlit Cloud Secrets 配置 `[auth]`，并且 Google 的 redirect URI 为 `https://randomfood.streamlit.app/oauth2callback`。")
         st.stop()
 
 
